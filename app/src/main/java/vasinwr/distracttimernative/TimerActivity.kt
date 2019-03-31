@@ -1,11 +1,9 @@
 package vasinwr.distracttimernative
 
 import android.Manifest
-import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Handler
-import android.os.PowerManager
 import android.os.SystemClock
 import android.support.v4.app.ActivityCompat
 import android.support.v7.app.AppCompatActivity
@@ -23,7 +21,7 @@ import android.widget.Toast
 class TimerActivity: AppCompatActivity() {
 
     companion object {
-        private const val POLL_INTERVAL: Long = 300
+        private const val POLL_INTERVAL: Long = 1000
     }
 
     private lateinit var recyclerView: RecyclerView
@@ -35,10 +33,21 @@ class TimerActivity: AppCompatActivity() {
     private val handler = Handler()
     private val RECORD_AUDIO = 0
     private var noiseSensorRunning = false
-    private var noiseThreshold = 0.0
+    private var DEFAULT_NOISE_THRESHOLD = 10.0
+    private var noisyTimerStarted = false
+    private var noisyTimerStartedTime : Long = -1
+
+    private val verifyNoiseAmpList = mutableListOf<Double>()
+    private var verifyNoiseStartedTime : Long = -1
+    private val NOISE_VERIFY_POLL_INTERVAL: Long = 300
+    private val NOISE_VERIFY_DURATION = 5000
+    private val RATIO_NOISY_THRESHOLD = 0.3
+
 
     lateinit var distractionClock: MiliChrono
     lateinit var mainClock: MiliChrono
+
+
     var distractionClockStarted = false
     var lastStartedDistraction:Int = -1
 
@@ -52,21 +61,69 @@ class TimerActivity: AppCompatActivity() {
     private val noisePollTask = object: Runnable {
         override fun run() {
             val amp = noiseSensor.amplitude
-            if (! "".equals(noiseThresholdInput.text.toString())) {
-                noiseThreshold = noiseThresholdInput.text.toString().toDouble()
-            }
-            if (amp > noiseThreshold) {
-                //TODO: take noise Threashold from View input
-                Toast.makeText(
-                    applicationContext, "Noise Thersold Crossed, amp=$amp.",
-                    Toast.LENGTH_LONG
-                ).show()
-                handler.postDelayed(this, POLL_INTERVAL*10)
+            val threshold = tryGetNoiseThresholdFromInput()
+            if (amp > threshold) {
+                gettingNoisy()
             }
             else {
                 handler.postDelayed(this, POLL_INTERVAL)
             }
         }
+    }
+
+    private val verifyNoisy = object: Runnable {
+        override fun run() {
+            val amp = noiseSensor.amplitude
+
+            if (SystemClock.elapsedRealtime() - verifyNoiseStartedTime < NOISE_VERIFY_DURATION) {
+                verifyNoiseAmpList.add(amp)
+                handler.postDelayed(this, NOISE_VERIFY_POLL_INTERVAL)
+            } else {
+                val ratioNoisy = findNoisyRatio()
+                verifyNoiseAmpList.clear()
+                if (ratioNoisy > RATIO_NOISY_THRESHOLD) {
+                    verifyNoiseStartedTime = SystemClock.elapsedRealtime()
+                    handler.postDelayed(this, NOISE_VERIFY_POLL_INTERVAL)
+                } else {
+                    noLongerNoisy()
+                }
+            }
+        }
+    }
+
+    private fun gettingNoisy() {
+        Toast.makeText(applicationContext, "getting noisy",Toast.LENGTH_LONG).show()
+
+        noisyTimerStartedTime = SystemClock.elapsedRealtime()
+        verifyNoiseStartedTime = SystemClock.elapsedRealtime()
+        handler.postDelayed(verifyNoisy, NOISE_VERIFY_POLL_INTERVAL)
+    }
+
+    private fun noLongerNoisy() {
+        val noisyTime = SystemClock.elapsedRealtime() - noisyTimerStartedTime
+
+        if (noisyTime > NOISE_VERIFY_DURATION *2){
+            Toast.makeText(applicationContext, "noisy time = ${noisyTime/1000} seconds",Toast.LENGTH_LONG).show()
+
+            noisyTimerStartedTime = -1
+            handler.postDelayed(noisePollTask, POLL_INTERVAL)
+        } else {
+            Toast.makeText(applicationContext, "wasn't really noisy",Toast.LENGTH_LONG).show()
+            handler.postDelayed(noisePollTask, POLL_INTERVAL)
+        }
+
+    }
+
+    private fun findNoisyRatio() : Double {
+        val threshold = tryGetNoiseThresholdFromInput()
+        return verifyNoiseAmpList.filter { amp -> amp > threshold }.size.toDouble() / (verifyNoiseAmpList.size)
+    }
+
+    private fun tryGetNoiseThresholdFromInput(): Double {
+        if (! "".equals(noiseThresholdInput.text.toString())) {
+            return noiseThresholdInput.text.toString().toDouble()
+        }
+        return DEFAULT_NOISE_THRESHOLD
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -122,6 +179,7 @@ class TimerActivity: AppCompatActivity() {
             return
         }
         handler.removeCallbacks(noisePollTask)
+        handler.removeCallbacks(verifyNoisy)
         noiseSensor.stop()
         noiseSensorRunning = false
     }
