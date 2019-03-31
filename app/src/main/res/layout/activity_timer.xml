@@ -22,11 +22,11 @@
             android:layout_weight="1"
             android:textAllCaps="false"
             android:text="Focus :)"
-            android:layout_marginBottom="92dp"
+            android:layout_marginBottom="88dp"
             app:layout_constraintBottom_toBottomOf="parent"
             android:layout_marginStart="8dp" app:layout_constraintStart_toStartOf="parent"
             android:layout_marginEnd="8dp" app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintHorizontal_bias="0.541"/>
+    />
 
 
     <TextView
@@ -52,6 +52,18 @@
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintVertical_bias="0.936" app:layout_constraintEnd_toStartOf="@+id/mainClock"
             android:layout_marginEnd="8dp" app:layout_constraintHorizontal_bias="0.115"/>
+    <EditText
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:inputType="number"
+            android:ems="10"
+            android:id="@+id/noiseThreshold" android:layout_marginBottom="8dp"
+            android:text="0"
+            app:layout_constraintBottom_toTopOf="@+id/buttonStartChronometer" android:layout_marginTop="8dp"
+            app:layout_constraintTop_toBottomOf="@+id/distractionsButton" android:layout_marginEnd="8dp"
+            app:layout_constraintEnd_toEndOf="parent" android:layout_marginStart="8dp"
+            app:layout_constraintStart_toStartOf="parent" app:layout_constraintHorizontal_bias="0.503"
+            app:layout_constraintVertical_bias="0.876"/>
 
 
 </android.support.constraint.ConstraintLayout>
