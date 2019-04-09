@@ -8,8 +8,9 @@ class DistractionDataSource {
     val distractions : MutableList<Distraction> = ArrayList()
     var totalTime: Long = 0L
     val focusedTime: Long
-        get() = totalTime - getTotalDistractedTime() - phoneTime
+        get() = totalTime - getTotalDistractedTime() - phoneTime - noisyTime
     var phoneTime: Long = 0L
+    var noisyTime: Long = 0L
 
     init {
 //        populateWithEmojiSample()

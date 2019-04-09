@@ -20,13 +20,22 @@
             <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:background="@color/focusGreen"
                     android:id="@+id/focusedItem"
             />
 
             <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:background="@color/Wheat"
                     android:id="@+id/phoneDistractItem"
+            />
+
+            <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@color/AliceBlue"
+                    android:id="@+id/noiseDistractItem"
             />
 
             <android.support.v7.widget.RecyclerView

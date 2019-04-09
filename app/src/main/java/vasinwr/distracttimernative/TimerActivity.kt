@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.SystemClock
 import android.support.v4.app.ActivityCompat
+import android.support.v4.content.ContextCompat
 import android.support.v7.app.AppCompatActivity
 import android.support.v7.widget.LinearLayoutManager
 import android.support.v7.widget.RecyclerView
@@ -16,6 +17,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
+import org.w3c.dom.Text
 
 
 class TimerActivity: AppCompatActivity() {
@@ -33,15 +35,16 @@ class TimerActivity: AppCompatActivity() {
     private val handler = Handler()
     private val RECORD_AUDIO = 0
     private var noiseSensorRunning = false
-    private var DEFAULT_NOISE_THRESHOLD = 10.0
-    private var noisyTimerStarted = false
+    private var DEFAULT_NOISE_THRESHOLD = 5.0
     private var noisyTimerStartedTime : Long = -1
 
     private val verifyNoiseAmpList = mutableListOf<Double>()
+    private val calibrateNoiseAmpList = mutableListOf<Double>()
     private var verifyNoiseStartedTime : Long = -1
-    private val NOISE_VERIFY_POLL_INTERVAL: Long = 300
-    private val NOISE_VERIFY_DURATION = 5000
-    private val RATIO_NOISY_THRESHOLD = 0.3
+    private var calibrateNoiseStartedTime : Long = -1
+    private val NOISE_VERIFY_POLL_INTERVAL: Long = 100
+    private val NOISE_VERIFY_DURATION = 3000
+    private val RATIO_NOISY_THRESHOLD = 0.2
 
 
     lateinit var distractionClock: MiliChrono
@@ -53,10 +56,29 @@ class TimerActivity: AppCompatActivity() {
 
     var onPausedTime = 0L
     var phoneDistractionLocal = 0L
+    var noiseDistractionLocal = 0L
 
     private val distractionData = DistractionDataSource.instance
 
     val distractionDurationLocal = LongArray(distractionData.distractions.size)
+
+    private val calibrateNoiseTask = object: Runnable {
+        override fun run() {
+            val amp = noiseSensor.amplitude
+            if (SystemClock.elapsedRealtime() - calibrateNoiseStartedTime < NOISE_VERIFY_DURATION) {
+                calibrateNoiseAmpList.add(amp)
+                handler.postDelayed(this, NOISE_VERIFY_POLL_INTERVAL)
+            }
+            else {
+                findViewById<EditText>(R.id.noiseThreshold)
+                    .setText(calibrationResult(calibrateNoiseAmpList).toString())
+                calibrateNoiseStartedTime = -1
+                calibrateNoiseAmpList.clear()
+                findViewById<Button>(R.id.calibrateNoise).isEnabled = true
+            }
+        }
+    }
+
 
     private val noisePollTask = object: Runnable {
         override fun run() {
@@ -79,7 +101,7 @@ class TimerActivity: AppCompatActivity() {
                 verifyNoiseAmpList.add(amp)
                 handler.postDelayed(this, NOISE_VERIFY_POLL_INTERVAL)
             } else {
-                val ratioNoisy = findNoisyRatio()
+                val ratioNoisy = findNoisyRatio(verifyNoiseAmpList, tryGetNoiseThresholdFromInput())
                 verifyNoiseAmpList.clear()
                 if (ratioNoisy > RATIO_NOISY_THRESHOLD) {
                     verifyNoiseStartedTime = SystemClock.elapsedRealtime()
@@ -93,6 +115,7 @@ class TimerActivity: AppCompatActivity() {
 
     private fun gettingNoisy() {
         Toast.makeText(applicationContext, "getting noisy",Toast.LENGTH_LONG).show()
+        findViewById<TextView>(R.id.noiseDistractItem).setBackgroundColor(ContextCompat.getColor(this, R.color.AliceBrightBlue))
 
         noisyTimerStartedTime = SystemClock.elapsedRealtime()
         verifyNoiseStartedTime = SystemClock.elapsedRealtime()
@@ -101,22 +124,26 @@ class TimerActivity: AppCompatActivity() {
 
     private fun noLongerNoisy() {
         val noisyTime = SystemClock.elapsedRealtime() - noisyTimerStartedTime
+        findViewById<TextView>(R.id.noiseDistractItem).setBackgroundColor(ContextCompat.getColor(this, R.color.AliceBlue))
 
-        if (noisyTime > NOISE_VERIFY_DURATION *2){
+        if (noisyTime > 5000){
             Toast.makeText(applicationContext, "noisy time = ${noisyTime/1000} seconds",Toast.LENGTH_LONG).show()
+
+            val noiseRow = findViewById<TextView>(R.id.noiseDistractItem)
+            noiseDistractionLocal += noisyTime
+            noiseRow.text = "Noise distraction = ${DevUtils.longToMinuteString(noiseDistractionLocal)}"
 
             noisyTimerStartedTime = -1
             handler.postDelayed(noisePollTask, POLL_INTERVAL)
         } else {
-            Toast.makeText(applicationContext, "wasn't really noisy",Toast.LENGTH_LONG).show()
+            Toast.makeText(applicationContext, "wasn't really noisy",Toast.LENGTH_SHORT).show()
             handler.postDelayed(noisePollTask, POLL_INTERVAL)
         }
 
     }
 
-    private fun findNoisyRatio() : Double {
-        val threshold = tryGetNoiseThresholdFromInput()
-        return verifyNoiseAmpList.filter { amp -> amp > threshold }.size.toDouble() / (verifyNoiseAmpList.size)
+    private fun findNoisyRatio(amps: List<Double>, threshold : Double) : Double {
+        return amps.filter { amp -> amp > threshold }.size.toDouble() / (amps.size)
     }
 
     private fun tryGetNoiseThresholdFromInput(): Double {
@@ -124,6 +151,16 @@ class TimerActivity: AppCompatActivity() {
             return noiseThresholdInput.text.toString().toDouble()
         }
         return DEFAULT_NOISE_THRESHOLD
+    }
+
+    private fun calibrationResult(amps: List<Double>) : Double {
+        // find lowest threshold which catigorise 'amps' as noisy
+        var threshold = -30.0
+        //naive way
+        while (findNoisyRatio(amps, threshold) > RATIO_NOISY_THRESHOLD) {
+            threshold += 0.1
+        }
+        return threshold
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -153,6 +190,14 @@ class TimerActivity: AppCompatActivity() {
         }
 
         noiseThresholdInput = findViewById(R.id.noiseThreshold)
+
+        findViewById<TextView>(R.id.noiseThreshold).setText(DEFAULT_NOISE_THRESHOLD.toString())
+
+        findViewById<Button>(R.id.calibrateNoise).setOnClickListener {
+            calibrateNoiseStartedTime = SystemClock.elapsedRealtime()
+            handler.postDelayed(calibrateNoiseTask, NOISE_VERIFY_POLL_INTERVAL)
+            (it as Button).isEnabled = false
+        }
     }
 
     private fun startNoiseDetection() {
@@ -171,6 +216,7 @@ class TimerActivity: AppCompatActivity() {
             )
         }
         noiseSensor.start()
+        noiseSensorRunning = true
         handler.postDelayed(noisePollTask, POLL_INTERVAL)
     }
 
@@ -199,6 +245,9 @@ class TimerActivity: AppCompatActivity() {
         val phoneRow = findViewById<TextView>(R.id.phoneDistractItem)
         phoneRow.text = "Phone distraction = ${DevUtils.longToDateString(phoneDistractionLocal)}"
 
+        val noiseRow = findViewById<TextView>(R.id.noiseDistractItem)
+        noiseRow.text = "Noise distraction = ${DevUtils.longToDateString(noiseDistractionLocal)}"
+
         startNoiseDetection()
     }
 
@@ -208,6 +257,7 @@ class TimerActivity: AppCompatActivity() {
         }
         distractionData.totalTime += mainClock.timeElapsed
         distractionData.phoneTime += phoneDistractionLocal
+        distractionData.noisyTime += noiseDistractionLocal
         super.onBackPressed()
     }
 

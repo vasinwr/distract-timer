@@ -3,4 +3,11 @@
     <color name="colorPrimary">#008577</color>
     <color name="colorPrimaryDark">#00574B</color>
     <color name="colorAccent">#D81B60</color>
+    <color name="Wheat">#F5DEB3</color>
+    <color name="PapayaWhip">#FFEFD5</color>
+    <color name="Cornsilk">#FFF8DC</color>
+    <color name="AliceBlue">#d8e9f9</color>
+    <color name="AliceBrightBlue">#94fff3</color>
+    <color name="focusGreen">#bcf99d</color>
+
 </resources>

@@ -114,6 +114,9 @@ class MainActivity : AppCompatActivity() {
         val phoneRow = findViewById<TextView>(R.id.phoneDistractItem)
         phoneRow.text = "Phone distraction = ${DevUtils.longToDateString(distractionData.phoneTime)}"
 
+        val noiseRow = findViewById<TextView>(R.id.noiseDistractItem)
+        noiseRow.text = "Noise distraction = ${DevUtils.longToDateString(distractionData.noisyTime)}"
+
         viewAdapter.notifyDataSetChanged()
     }
 
